@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Peer from 'peerjs';
 
+// Servidores STUN públicos da Google para contornar NAT/Firewalls em celulares (4G/5G)
+const iceServers = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' }
+];
+
 export function useChat() {
   const [myId, setMyId] = useState('');
   const [userName, setUserName] = useState(() => sessionStorage.getItem('chat_username') || 'Usuário');
@@ -93,19 +102,18 @@ export function useChat() {
     });
 
     conn.on('error', (err) => {
-      console.error('Erro na conexão com peer:', err);
+      console.error('Erro na conexão:', err);
     });
   }, [addMessage, userName]);
 
   useEffect(() => {
     const randomId = 'user-' + Math.random().toString(36).substring(2, 8);
     
-    // Conectando ao servidor público do PeerJS de forma robusta
+    // Configuração oficial do servidor WebRTC do PeerJS com suporte STUN
     const peer = new Peer(randomId, {
-      host: '0.peerjs.com',
-      port: 443,
-      path: '/',
-      secure: true,
+      config: {
+        iceServers: iceServers
+      },
       debug: 1
     });
 
@@ -121,7 +129,7 @@ export function useChat() {
     });
 
     peer.on('error', (err) => {
-      console.error('Erro de servidor PeerJS:', err);
+      console.error('Erro de PeerJS:', err);
       setStatus('error');
     });
 
@@ -133,6 +141,12 @@ export function useChat() {
   const connectToPeer = (targetId) => {
     if (!targetId || targetId === myId) return;
     if (!peerRef.current) return;
+
+    // Se já houver conexão existente, reaproveita
+    if (connections[targetId] && connections[targetId].open) {
+      setActivePeerId(targetId);
+      return;
+    }
 
     const conn = peerRef.current.connect(targetId, {
       reliable: true

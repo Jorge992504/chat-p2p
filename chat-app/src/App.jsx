@@ -164,7 +164,7 @@ export default function App() {
 
               <div className={`badge-conn ${isConnected ? 'connected' : ''}`}>
                 {isConnected ? <Wifi size={14} /> : <WifiOff size={14} />}
-                <span>{isConnected ? 'Conectado Direct' : 'Aguardando/Offline'}</span>
+                <span>{isConnected ? 'Conectado P2P' : 'Aguardando / Offline'}</span>
               </div>
             </div>
 
