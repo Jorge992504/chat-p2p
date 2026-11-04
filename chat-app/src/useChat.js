@@ -18,7 +18,6 @@ export function useChat() {
 
   const peerRef = useRef(null);
 
-  // Guarda apenas no sessionStorage (apaga ao fechar a aba)
   useEffect(() => {
     sessionStorage.setItem('chat_contacts', JSON.stringify(contacts));
   }, [contacts]);
@@ -30,33 +29,6 @@ export function useChat() {
   useEffect(() => {
     sessionStorage.setItem('chat_username', userName);
   }, [userName]);
-
-  useEffect(() => {
-    const randomId = 'user-' + Math.random().toString(36).substring(2, 8);
-    const peer = new Peer(randomId, {
-      debug: 1,
-    });
-
-    peerRef.current = peer;
-
-    peer.on('open', (id) => {
-      setMyId(id);
-      setStatus('ready');
-    });
-
-    peer.on('connection', (conn) => {
-      setupConnection(conn);
-    });
-
-    peer.on('error', (err) => {
-      console.error('Erro de conexão P2P:', err);
-      setStatus('error');
-    });
-
-    return () => {
-      peer.destroy();
-    };
-  }, []);
 
   const addMessage = useCallback((peerId, msgObj) => {
     setMessages((prev) => {
@@ -119,13 +91,53 @@ export function useChat() {
         [conn.peer]: { ...prev[conn.peer], online: false },
       }));
     });
+
+    conn.on('error', (err) => {
+      console.error('Erro na conexão com peer:', err);
+    });
   }, [addMessage, userName]);
 
+  useEffect(() => {
+    const randomId = 'user-' + Math.random().toString(36).substring(2, 8);
+    
+    // Conectando ao servidor público do PeerJS de forma robusta
+    const peer = new Peer(randomId, {
+      host: '0.peerjs.com',
+      port: 443,
+      path: '/',
+      secure: true,
+      debug: 1
+    });
+
+    peerRef.current = peer;
+
+    peer.on('open', (id) => {
+      setMyId(id);
+      setStatus('ready');
+    });
+
+    peer.on('connection', (conn) => {
+      setupConnection(conn);
+    });
+
+    peer.on('error', (err) => {
+      console.error('Erro de servidor PeerJS:', err);
+      setStatus('error');
+    });
+
+    return () => {
+      peer.destroy();
+    };
+  }, [setupConnection]);
+
   const connectToPeer = (targetId) => {
-    if (!targetId || targetId === myId || connections[targetId]) return;
+    if (!targetId || targetId === myId) return;
     if (!peerRef.current) return;
 
-    const conn = peerRef.current.connect(targetId);
+    const conn = peerRef.current.connect(targetId, {
+      reliable: true
+    });
+    
     setupConnection(conn);
     setActivePeerId(targetId);
     
@@ -172,6 +184,6 @@ export function useChat() {
     status,
     connectToPeer,
     sendMessage,
-    isConnected: !!connections[activePeerId],
+    isConnected: !!(connections[activePeerId] && connections[activePeerId].open),
   };
 }
